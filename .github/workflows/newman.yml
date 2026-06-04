@@ -1,0 +1,97 @@
+name: Newman Contract Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  newman:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [mock, local]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # --- BỔ SUNG: Cài đặt Python và các thư viện cần thiết cho Server thật ---
+      - name: Setup Python (Local environment only)
+        if: matrix.env == 'local'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        if: matrix.env == 'local'
+        run: |
+          pip install uvicorn fastapi
+          # Nếu bạn có file requirements.txt, hãy bỏ dấu # ở dòng dưới để chạy:
+          # [ -f requirements.txt ] && pip install -r requirements.txt || true
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Lint OpenAPI contracts
+        run: npm run lint:contracts
+
+      - name: Start Prism mock servers
+        if: matrix.env == 'mock'
+        run: |
+          nohup npm run mock:iot > prism-iot.log 2>&1 &
+          nohup npm run mock:vision > prism-vision.log 2>&1 &
+
+      - name: Wait for mock servers
+        if: matrix.env == 'mock'
+        run: npx wait-on http-get://localhost:4010/health http-get://localhost:4011/health --timeout 30000
+
+      # --- BẬT MOCK SERVER VISION CHO LOCAL ---
+      - name: Start AI Vision Mock for Local environment
+        if: matrix.env == 'local'
+        run: |
+          nohup npm run mock:vision > prism-vision-local.log 2>&1 &
+
+      # --- KHỞI ĐỘNG SERVER THẬT CHO LOCAL ---
+      - name: Start Real Backend Server
+        if: matrix.env == 'local'
+        run: |
+          nohup uvicorn main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
+
+      # --- ĐÃ SỬA CÚ PHÁP: Chờ cả 2 server ở môi trường Local sẵn sàng ---
+      - name: Wait for Local environment servers
+        if: matrix.env == 'local'
+        run: |
+          sleep 5
+          npx wait-on http://127.0.0.1:8000/health tcp:localhost:4011 --timeout 30000
+
+      # --- CHẠY NEWMAN TEST ---
+      - name: Run Newman contract tests
+        run: |
+          if [ "${{ matrix.env }}" = "mock" ]; then
+            npm run test:mock;
+          else
+            npm run test:local;
+          fi
+
+      # --- HIỂN THỊ LOG CHI TIẾT KHI THẤT BẠI ---
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Prism IoT Logs ===" && cat prism-iot.log || true
+          echo "=== Prism Vision Logs ===" && cat prism-vision.log || true
+          echo "=== Prism Vision Local Logs ===" && cat prism-vision-local.log || true
+          echo "=== Real Backend Logs ===" && cat backend.log || true
+
+      - name: Upload Newman reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-reports-${{ matrix.env }}
+          path: reports/

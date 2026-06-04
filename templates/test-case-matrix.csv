@@ -1,0 +1,6 @@
+ID,Folder,Endpoint,Method,Scenario,Input file/body,Expected status,Expected response check,Type,Pass/Fail,Evidence
+TC01,Functional,/health,GET,Service is alive,-,200,status=ok,functional,,
+TC02,Functional,/readings,POST,Create reading happy path,mock-data/sensor-reading-valid.json,201,"has reading_id, accepted=true",functional,,
+TC03,Negative,/readings,POST,Missing device_id,mock-data/sensor-reading-invalid-missing-device.json,400,Problem Details,negative,,
+TC04,Auth,/readings,POST,Missing token,mock-data/sensor-reading-valid.json,401,Problem Details,auth,,
+TC05,Boundary,/readings,POST,High temperature boundary,mock-data/sensor-reading-boundary.json,201/400,documented behavior,boundary,,

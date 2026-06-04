@@ -1,0 +1,23 @@
+{
+  "name": "fit4110_lab03_postman_mock_testing",
+  "version": "0.3.0",
+  "private": true,
+  "description": "FIT4110 Lab 03 - Postman, Mock Server, Contract Testing, Newman CI",
+  "scripts": {
+    "mock:iot": "prism mock contracts/iot-ingestion.openapi.yaml -p 4010 --host 0.0.0.0",
+    "mock:vision": "prism mock contracts/ai-vision.openapi.yaml -p 4011 --host 0.0.0.0",
+    "mock:all": "sh -c 'npm run mock:iot & npm run mock:vision & wait'",
+    "lint:contracts": "spectral lint contracts/*.yaml --fail-severity error",
+    "test:mock": "node scripts/run-mocks-and-newman.js",
+    "test:local": "node scripts/run-newman-local.js",
+    "test:html": "node scripts/run-newman-local.js",
+    "test:ci": "npm run lint:contracts && npm run test:mock"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "^5.14.2",
+    "@stoplight/spectral-cli": "^6.15.0",
+    "newman": "^6.2.1",
+    "newman-reporter-htmlextra": "^1.23.1",
+    "wait-on": "^7.2.0"
+  }
+}
